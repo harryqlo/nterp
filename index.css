@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Base Styles */
+body {
+  @apply bg-slate-50 text-slate-900 transition-colors duration-300;
+}
+
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+/* Custom scrollbar - High Visibility / High Contrast */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 7px;
+  border: 3px solid #e2e8f0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Dark Mode Scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b; /* Slate 800 */
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569; /* Slate 600 */
+  border-color: #1e293b; /* Slate 800 */
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* Slate 500 */
+}
+
+/* Custom Utility Classes for Forms */
+.input-std {
+  @apply w-full p-2 rounded-lg border border-slate-200 text-sm text-slate-900 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all;
+}
+
+/* Dark Mode Input */
+.dark .input-std {
+  @apply bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-blue-400 focus:ring-blue-400;
+}
+
+/* Fix for Select Dropdown Options */
+select option, select.input-std option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+.dark select option, .dark select.input-std option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.label-xs {
+  @apply block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1;
+}
+.dark .label-xs {
+  @apply text-slate-400;
+}
+
+.btn-secondary {
+    @apply px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors;
+}
