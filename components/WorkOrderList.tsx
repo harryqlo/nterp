@@ -7,10 +7,13 @@ import { PERMISSIONS } from '../utils/roleUtils';
 import { Icons } from './Icons';
 import { WorkOrderDetailModal } from './WorkOrderDetailModal';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
+import * as XLSX from 'xlsx';
+import { useToast } from '../context/ToastContext';
 
 export const WorkOrderList: React.FC = () => {
   const { workOrders } = useApp();
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [viewMode, setViewMode] = useState<'LIST' | 'BOARD'>('LIST');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterArea, setFilterArea] = useState<string>('ALL');
@@ -39,6 +42,48 @@ export const WorkOrderList: React.FC = () => {
 
     return matchStatus && matchArea && matchUrgent && matchSearch;
   });
+
+  const handleExportExcel = () => {
+    try {
+        const dataToExport = filteredOrders.map(ot => {
+            const deadline = getDeadlineStatus(ot.estimatedCompletionDate, ot.status);
+            const progress = ot.tasks && ot.tasks.length > 0 
+                ? Math.round((ot.tasks.filter(t => t.isCompleted).length / ot.tasks.length) * 100) 
+                : 0;
+            
+            return {
+                "N° OT": ot.id,
+                "Cliente": ot.clientId,
+                "Título / Descripción": ot.title,
+                "Identificación": ot.identification || 'N/A',
+                "Área": ot.area,
+                "Estado": ot.status,
+                "Prioridad": ot.priority,
+                "Fecha Ingreso": formatDate(ot.creationDate),
+                "Fecha Entrega": formatDate(ot.estimatedCompletionDate),
+                "Situación Plazo": deadline.label,
+                "Avance (%)": `${progress}%`,
+                "Técnico Asignado": ot.technicianId || 'Pendiente'
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Ordenes de Trabajo");
+        
+        // Auto-width columns roughly
+        const wscols = [
+            {wch: 10}, {wch: 20}, {wch: 30}, {wch: 15}, {wch: 10}, {wch: 12}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 15}, {wch: 10}, {wch: 15}
+        ];
+        worksheet['!cols'] = wscols;
+
+        XLSX.writeFile(workbook, `Reporte_OTs_${new Date().toISOString().split('T')[0]}.xlsx`);
+        addToast("Reporte Excel generado exitosamente", "SUCCESS");
+    } catch (error) {
+        console.error("Export error:", error);
+        addToast("Error al generar el Excel", "ERROR");
+    }
+  };
 
   // Kanban Columns Configuration
   const columns = [
@@ -98,6 +143,15 @@ export const WorkOrderList: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
+            <button 
+                onClick={handleExportExcel}
+                className="bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 px-3 py-2 rounded-lg flex items-center space-x-2 transition-all shadow-sm"
+                title="Exportar a Excel"
+            >
+                <Icons.Excel size={18} className="text-green-600" />
+                <span className="hidden sm:inline text-sm font-bold">Exportar</span>
+            </button>
+
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 flex">
                 <button 
                     onClick={() => setViewMode('LIST')}

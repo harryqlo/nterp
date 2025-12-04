@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
@@ -9,11 +8,14 @@ import { Icons } from './Icons';
 import { format, subDays, isAfter, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Status } from '../types';
+import * as XLSX from 'xlsx';
+import { useToast } from '../context/ToastContext';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export const Reports: React.FC = () => {
   const { workOrders, technicians } = useApp();
+  const { addToast } = useToast();
   const [dateRange, setDateRange] = useState<'30DAYS' | '90DAYS' | 'YEAR'>('30DAYS');
 
   // --- DATA PROCESSING HELPERS ---
@@ -58,7 +60,6 @@ export const Reports: React.FC = () => {
       const totalCost = totalLaborCost + totalMaterialCost + totalServiceCost;
       
       // Simulated Revenue (Assume 30% margin over cost for demo purposes if quote is missing)
-      // In a real app, we would strictly use ot.quotedValue
       const totalRevenue = filteredOTs.reduce((acc, ot) => {
           return acc + (ot.quotedValue || (totalCost > 0 ? (totalCost / filteredOTs.length * 1.3) : 0) || 0);
       }, 0);
@@ -71,6 +72,7 @@ export const Reports: React.FC = () => {
           totalLaborCost,
           totalMaterialCost,
           totalServiceCost,
+          totalRevenue,
           margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
       };
   }, [filteredOTs]);
@@ -80,7 +82,7 @@ export const Reports: React.FC = () => {
       // Group by day/week would be better, keeping simple by Creation Date
       const dataMap = new Map<string, { date: string, creadas: number, finalizadas: number }>();
       
-      // Inicializar mapa ordenado (hack para demo visual, idealmente usar eachDayOfInterval)
+      // Inicializar mapa ordenado
       filteredOTs.forEach(ot => {
           const d = format(parseISO(ot.creationDate), 'dd/MM', { locale: es });
           if (!dataMap.has(d)) dataMap.set(d, { date: d, creadas: 0, finalizadas: 0 });
@@ -93,7 +95,6 @@ export const Reports: React.FC = () => {
           dataMap.get(d)!.finalizadas += 1;
       });
 
-      // Convertir a array y ordenar (simple string sort dd/mm funciona para ventanas cortas)
       return Array.from(dataMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredOTs, workOrders, filterDate]);
 
@@ -104,11 +105,9 @@ export const Reports: React.FC = () => {
       technicians.forEach(t => techMap.set(t.id, { name: t.name, hours: 0, ots: 0 }));
 
       filteredOTs.forEach(ot => {
-          // Count main technician OT assignment
           if (ot.technicianId && techMap.has(ot.technicianId)) {
               techMap.get(ot.technicianId)!.ots += 1;
           }
-          // Sum hours from labor entries
           (ot.labor || []).forEach(l => {
               if (techMap.has(l.technicianId)) {
                   techMap.get(l.technicianId)!.hours += l.hours;
@@ -126,6 +125,53 @@ export const Reports: React.FC = () => {
       { name: 'Terceros', value: kpis.totalServiceCost },
   ].filter(i => i.value > 0);
 
+  const handleExportReport = () => {
+    try {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: KPIs Summary
+        const kpiData = [
+            ["Indicador", "Valor"],
+            ["Total OTs Gestionadas", kpis.otCount],
+            ["Tasa Finalización", `${kpis.completionRate}%`],
+            ["Cumplimiento Plazos", `${kpis.onTimeRate}%`],
+            ["Ingresos Estimados", kpis.totalRevenue],
+            ["Costo Operativo Total", kpis.totalCost],
+            ["  - Costo Materiales", kpis.totalMaterialCost],
+            ["  - Costo Mano Obra", kpis.totalLaborCost],
+            ["  - Costo Servicios", kpis.totalServiceCost],
+            ["Margen Comercial", `${kpis.margin.toFixed(2)}%`]
+        ];
+        const wsKPI = XLSX.utils.aoa_to_sheet(kpiData);
+        XLSX.utils.book_append_sheet(wb, wsKPI, "Resumen KPI");
+
+        // Sheet 2: Detailed Costs per OT
+        const detailsData = filteredOTs.map(ot => {
+            const matCost = (ot.materials || []).reduce((acc, m) => acc + (m.totalCost || 0), 0);
+            const labCost = (ot.labor || []).reduce((acc, l) => acc + (l.hours * 15000), 0);
+            const servCost = (ot.services || []).reduce((acc, s) => acc + (s.cost || 0), 0);
+            return {
+                "OT": ot.id,
+                "Cliente": ot.clientId,
+                "Título": ot.title,
+                "Estado": ot.status,
+                "Costo Materiales": matCost,
+                "Costo HH": labCost,
+                "Costo Servicios": servCost,
+                "Costo Total": matCost + labCost + servCost
+            };
+        });
+        const wsDetails = XLSX.utils.json_to_sheet(detailsData);
+        XLSX.utils.book_append_sheet(wb, wsDetails, "Detalle Costos OT");
+
+        XLSX.writeFile(wb, `Reporte_Financiero_${dateRange}.xlsx`);
+        addToast("Reporte Financiero exportado", "SUCCESS");
+    } catch (e) {
+        console.error(e);
+        addToast("Error al exportar reporte", "ERROR");
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -133,25 +179,34 @@ export const Reports: React.FC = () => {
             <h2 className="text-2xl font-bold text-slate-800">Reportes & Analítica</h2>
             <p className="text-sm text-slate-500">Indicadores clave de rendimiento (KPIs) y financieros.</p>
         </div>
-        <div className="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+        <div className="flex items-center gap-2">
             <button 
-                onClick={() => setDateRange('30DAYS')}
-                className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === '30DAYS' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                onClick={handleExportReport}
+                className="flex items-center gap-2 bg-white text-green-700 border border-green-200 px-4 py-1.5 rounded text-xs font-bold hover:bg-green-50 transition-colors shadow-sm"
             >
-                30 Días
+                <Icons.Excel size={16}/> Descargar Excel
             </button>
-            <button 
-                onClick={() => setDateRange('90DAYS')}
-                className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === '90DAYS' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-                Trimestre
-            </button>
-            <button 
-                onClick={() => setDateRange('YEAR')}
-                className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === 'YEAR' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-                Anual
-            </button>
+            <div className="w-px h-6 bg-slate-300 mx-2"></div>
+            <div className="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+                <button 
+                    onClick={() => setDateRange('30DAYS')}
+                    className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === '30DAYS' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    30 Días
+                </button>
+                <button 
+                    onClick={() => setDateRange('90DAYS')}
+                    className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === '90DAYS' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Trimestre
+                </button>
+                <button 
+                    onClick={() => setDateRange('YEAR')}
+                    className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${dateRange === 'YEAR' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Anual
+                </button>
+            </div>
         </div>
       </div>
 

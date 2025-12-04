@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { WorkOrder, Status, Comment, WorkOrderTask, LaborEntry, ServiceEntry } from '../types';
 import { useApp } from '../context/AppContext';
@@ -136,65 +135,76 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
     <>
     {/* --- PRINT ONLY LAYOUT --- */}
     <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 font-sans text-black">
-        <div className="border-b-2 border-slate-800 pb-4 mb-6 flex justify-between items-start">
+        <div className="border-b-4 border-slate-900 pb-4 mb-6 flex justify-between items-start">
             <div>
-                <h1 className="text-3xl font-bold uppercase tracking-wide">Orden de Trabajo</h1>
-                <p className="text-lg text-slate-600 font-bold">{settings.companyName}</p>
+                <h1 className="text-4xl font-extrabold uppercase tracking-wide">Orden de Trabajo</h1>
+                <p className="text-lg text-slate-700 font-bold mt-1">{settings.companyName}</p>
+                <div className="text-xs mt-2 text-slate-500">Documento Interno de Control de Producción</div>
             </div>
-            <div className="text-right">
-                <h2 className="text-4xl font-mono font-bold">{ot.id}</h2>
-                <p className="text-sm text-slate-500">Fecha Ingreso: {formatDate(ot.creationDate)}</p>
-                <div className="mt-2 border border-slate-800 px-2 py-1 text-center font-bold">{ot.area}</div>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8 mb-6">
-            <div className="space-y-2">
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Cliente:</span> <span>{ot.clientId}</span></div>
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Identificación:</span> <span>{ot.identification || 'N/A'}</span></div>
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Orden Compra:</span> <span>{ot.clientOC || 'N/A'}</span></div>
-            </div>
-            <div className="space-y-2">
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Entrega Est.:</span> <span>{formatDate(ot.estimatedCompletionDate)}</span></div>
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Prioridad:</span> <span>{ot.priority}</span></div>
-                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Técnico:</span> <span>{getTechnicianName(ot.technicianId) || 'Pendiente'}</span></div>
+            <div className="text-right flex flex-col items-end">
+                <div className="text-5xl font-mono font-bold tracking-tighter mb-2">{ot.id}</div>
+                {/* CSS Barcode Simulation */}
+                <div className="h-12 w-48 bg-[repeating-linear-gradient(90deg,black,black_2px,transparent_2px,transparent_4px)] mb-1"></div>
+                <p className="text-[10px] font-mono">{ot.id}-{Date.now().toString().slice(-4)}</p>
             </div>
         </div>
 
-        <div className="mb-8 p-4 border border-slate-300 rounded bg-slate-50">
-            <h3 className="font-bold uppercase text-xs mb-2 text-slate-500">Descripción del Trabajo</h3>
-            <p className="whitespace-pre-wrap text-sm">{ot.description}</p>
+        <div className="grid grid-cols-2 gap-8 mb-6 border border-slate-300 p-4">
+            <div className="space-y-3">
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Cliente:</span> <span className="font-bold text-lg">{ot.clientId}</span></div>
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Identificación:</span> <span className="font-mono">{ot.identification || 'N/A'}</span></div>
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Orden Compra:</span> <span>{ot.clientOC || 'N/A'}</span></div>
+            </div>
+            <div className="space-y-3">
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Fecha Ingreso:</span> <span>{formatDate(ot.creationDate)}</span></div>
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Entrega Est.:</span> <span className="font-bold">{formatDate(ot.estimatedCompletionDate)}</span></div>
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Prioridad:</span> <span className="uppercase font-bold">{ot.priority}</span></div>
+                <div className="flex border-b border-dashed border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs text-slate-600">Área:</span> <span className="uppercase font-bold">{ot.area}</span></div>
+            </div>
+        </div>
+
+        <div className="mb-6">
+            <h3 className="bg-slate-200 px-2 py-1 font-bold uppercase text-xs mb-2 border-l-4 border-slate-800">Descripción del Trabajo</h3>
+            <div className="p-4 border border-slate-300 bg-slate-50 min-h-[100px]">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{ot.description}</p>
+            </div>
         </div>
 
         <div className="mb-8">
-             <h3 className="font-bold uppercase text-sm border-b-2 border-slate-800 mb-2">Planificación de Tareas</h3>
-             <ul className="space-y-2">
+             <h3 className="bg-slate-200 px-2 py-1 font-bold uppercase text-xs mb-2 border-l-4 border-slate-800">Planificación de Tareas (Checklist)</h3>
+             <ul className="border border-slate-300 divide-y divide-slate-200">
                  {(ot.tasks || []).length > 0 ? (ot.tasks || []).map((t, i) => (
-                     <li key={i} className="flex items-start gap-2">
-                         <div className="w-4 h-4 border border-slate-400 mt-0.5"></div>
-                         <span className="text-sm">{t.description}</span>
+                     <li key={i} className="flex items-center gap-4 p-2">
+                         <div className="w-6 h-6 border-2 border-slate-400 rounded-sm"></div>
+                         <span className="text-sm font-medium">{t.description}</span>
                      </li>
-                 )) : <li className="text-sm italic text-slate-500">Sin tareas definidas.</li>}
+                 )) : (
+                     <li className="p-4 text-center text-slate-400 italic">Espacio para tareas manuales...</li>
+                 )}
+                 {/* Empty lines for manual writing */}
+                 {[1,2,3].map(i => <li key={`e-${i}`} className="h-10 border-b border-dashed border-slate-200"></li>)}
              </ul>
         </div>
 
-        <div className="grid grid-cols-2 gap-12 mt-20 pt-10 border-t border-slate-200">
+        <div className="grid grid-cols-2 gap-12 mt-auto pt-20">
              <div className="text-center">
-                 <div className="border-b border-black mb-2 mx-10"></div>
+                 <div className="border-b-2 border-slate-800 mb-2 mx-10"></div>
                  <p className="text-xs uppercase font-bold">Firma Técnico Responsable</p>
+                 <p className="text-[10px] text-slate-500 mt-1">Declaro haber completado los trabajos según especificación.</p>
              </div>
              <div className="text-center">
-                 <div className="border-b border-black mb-2 mx-10"></div>
+                 <div className="border-b-2 border-slate-800 mb-2 mx-10"></div>
                  <p className="text-xs uppercase font-bold">VºBº Supervisor / Control Calidad</p>
+                 <p className="text-[10px] text-slate-500 mt-1">Trabajo liberado para entrega.</p>
              </div>
         </div>
         
-        <div className="fixed bottom-4 left-0 w-full text-center text-xs text-slate-400">
-            Generado por Sistema North Chrome | {new Date().toLocaleString()}
+        <div className="fixed bottom-0 left-0 w-full text-center border-t border-slate-300 pt-2 pb-4">
+            <p className="text-[10px] font-mono text-slate-400">Generado por Sistema North Chrome | {new Date().toLocaleString()} | ID: {ot.id}</p>
         </div>
     </div>
 
-    {/* --- NORMAL MODAL LAYOUT --- */}
+    {/* --- NORMAL MODAL LAYOUT (HIDDEN WHEN PRINTING) --- */}
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
       <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
         
@@ -221,7 +231,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
           
           <div className="flex items-center gap-2">
               <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full transition-colors text-xs font-bold shadow-sm">
-                  <Icons.Download size={16} /> Imprimir
+                  <Icons.Download size={16} /> Imprimir Hoja Ruta
               </button>
               {isSupervisor && !isEditing && ot.status !== Status.FINISHED && (
                   <button onClick={startEditing} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full transition-colors"><Icons.Edit size={20} /></button>
