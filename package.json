@@ -3,6 +3,7 @@
   "version": "2.1.0",
   "private": true,
   "type": "module",
+  "homepage": "https://harryqlo.github.io/nterp/",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

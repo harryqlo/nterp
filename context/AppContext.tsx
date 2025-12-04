@@ -14,8 +14,6 @@ const INITIAL_USERS: User[] = [
   { id: 'U4', name: 'Encargado Bodega', email: 'bodega@northchrome.cl', password: 'user', role: 'WAREHOUSE', active: true },
 ];
 
-// ... (INITIAL_OTS, INITIAL_INVENTORY, etc. kept same but truncated for brevity, assume existing data structures) ...
-// To save space, I am keeping the seed data handling exactly as is, focusing on the Context Provider implementation.
 const INITIAL_OTS: WorkOrder[] = [
   {
     id: 'OT.1001',
@@ -188,75 +186,47 @@ interface AppContextProps {
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
+// Helper for safe JSON parsing to prevent crashes
+const safeParse = <T,>(key: string, fallback: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (error) {
+    console.warn(`Error parsing ${key} from localStorage, using fallback.`, error);
+    return fallback;
+  }
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // ... (State initializers same as before)
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() => {
-    const saved = localStorage.getItem('north_chrome_ots');
-    return saved ? JSON.parse(saved) : INITIAL_OTS;
-  });
+  
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() => safeParse('north_chrome_ots', INITIAL_OTS));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => safeParse('north_chrome_inventory', INITIAL_INVENTORY));
+  const [supplyDocuments, setSupplyDocuments] = useState<SupplyDocument[]>(() => safeParse('north_chrome_supply_docs', INITIAL_SUPPLY_DOCS));
+  const [consumptionHistory, setConsumptionHistory] = useState<ConsumptionRecord[]>(() => safeParse('north_chrome_consumption', []));
+  const [components, setComponents] = useState<Component[]>(() => safeParse('north_chrome_components', INITIAL_COMPONENTS));
+  
+  const [technicians, setTechnicians] = useState<Technician[]>(() => safeParse('north_chrome_techs', [
+     { id: 'U3', name: 'Técnico Juan', specialty: 'CNC', active: true },
+     { id: 'T2', name: 'Carlos Mecánico', specialty: 'Mecánica', active: true }
+  ]));
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem('north_chrome_inventory');
-    return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
-  });
-
-  const [supplyDocuments, setSupplyDocuments] = useState<SupplyDocument[]>(() => {
-    const saved = localStorage.getItem('north_chrome_supply_docs');
-    return saved ? JSON.parse(saved) : INITIAL_SUPPLY_DOCS;
-  });
-
-  const [consumptionHistory, setConsumptionHistory] = useState<ConsumptionRecord[]>(() => {
-    const saved = localStorage.getItem('north_chrome_consumption');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [components, setComponents] = useState<Component[]>(() => {
-    const saved = localStorage.getItem('north_chrome_components');
-    return saved ? JSON.parse(saved) : INITIAL_COMPONENTS;
-  });
-
-  const [technicians, setTechnicians] = useState<Technician[]>(() => {
-     const saved = localStorage.getItem('north_chrome_techs');
-     return saved ? JSON.parse(saved) : [
-         { id: 'U3', name: 'Técnico Juan', specialty: 'CNC', active: true },
-         { id: 'T2', name: 'Carlos Mecánico', specialty: 'Mecánica', active: true }
-     ];
-  });
-
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('north_chrome_users_db');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
+  const [users, setUsers] = useState<User[]>(() => safeParse('north_chrome_users_db', INITIAL_USERS));
 
   // --- PAÑOL STATE INITIALIZATION ---
-  const [tools, setTools] = useState<Tool[]>(() => {
-      const saved = localStorage.getItem('north_chrome_tools');
-      return saved ? JSON.parse(saved) : INITIAL_TOOLS;
-  });
-
-  const [toolLoans, setToolLoans] = useState<ToolLoan[]>(() => {
-      const saved = localStorage.getItem('north_chrome_tool_loans');
-      return saved ? JSON.parse(saved) : [];
-  });
-
-  const [toolMaintenances, setToolMaintenances] = useState<ToolMaintenance[]>(() => {
-      const saved = localStorage.getItem('north_chrome_tool_maintenances');
-      return saved ? JSON.parse(saved) : [];
-  });
+  const [tools, setTools] = useState<Tool[]>(() => safeParse('north_chrome_tools', INITIAL_TOOLS));
+  const [toolLoans, setToolLoans] = useState<ToolLoan[]>(() => safeParse('north_chrome_tool_loans', []));
+  const [toolMaintenances, setToolMaintenances] = useState<ToolMaintenance[]>(() => safeParse('north_chrome_tool_maintenances', []));
 
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
 
-  const [settings, setSettings] = useState<AppSettings>(() => {
-      const saved = localStorage.getItem('north_chrome_settings');
-      return saved ? JSON.parse(saved) : {
-        companyName: 'North Chrome Ltda.',
-        photoServerUrl: 'https://picsum.photos/v2/list', 
-        notificationsEnabled: true,
-        debugModeEnabled: false,
-        theme: 'light'
-      };
-  });
+  const [settings, setSettings] = useState<AppSettings>(() => safeParse('north_chrome_settings', {
+      companyName: 'North Chrome Ltda.',
+      photoServerUrl: 'https://picsum.photos/v2/list', 
+      notificationsEnabled: true,
+      debugModeEnabled: false,
+      theme: 'light'
+  }));
 
   // Persistence Effects
   useEffect(() => localStorage.setItem('north_chrome_ots', JSON.stringify(workOrders)), [workOrders]);
@@ -292,8 +262,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [settings.debugModeEnabled]);
 
-  // ... (Action Helpers logActivity, addDebugLog, updateSettings, addWorkOrder, updateWorkOrder, etc. kept same)
-  
   const logActivity = useCallback((action: ActivityLogEntry['action'], entity: ActivityLogEntry['entity'], details: string) => {
     const newEntry: ActivityLogEntry = {
       id: Date.now().toString(),
@@ -326,7 +294,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
       setSettings(prev => ({ ...prev, ...newSettings }));
-      // Don't log every theme change to avoid spam, but log other changes
       const keys = Object.keys(newSettings);
       if (!keys.includes('theme')) {
           logActivity('UPDATE', 'SYSTEM', `Configuración actualizada: ${keys.join(', ')}`);

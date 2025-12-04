@@ -15,10 +15,17 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { users, logActivity, addDebugLog, updateSettings, settings } = useApp();
+  
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('north_chrome_active_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('north_chrome_active_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.warn("Failed to parse active user from storage", e);
+      return null;
+    }
   });
+  
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
