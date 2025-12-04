@@ -58,6 +58,12 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       setLaborForm({ techId: '', hours: 0, desc: '' });
   };
 
+  const handleDeleteLabor = (laborId: string) => {
+      if (!window.confirm("¿Eliminar este registro de horas?")) return;
+      const newLabor = (ot.labor || []).filter(l => l.id !== laborId);
+      updateWorkOrder(ot.id, { labor: newLabor });
+  };
+
   const handleAddService = () => {
       if(!serviceForm.provider || !serviceForm.desc || serviceForm.cost <= 0) return alert("Complete los datos del servicio.");
       const entry: ServiceEntry = { id: `SV-${Date.now()}`, provider: serviceForm.provider, description: serviceForm.desc, cost: serviceForm.cost, referenceDoc: serviceForm.ref, date: new Date().toISOString() };
@@ -65,7 +71,18 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       setServiceForm({ provider: '', desc: '', cost: 0, ref: '' });
   };
 
-  const getTechnicianName = (id?: string) => { if (!id) return null; const userTech = users.find(u => u.id === id); if (userTech) return userTech.name; const tech = technicians.find(t => t.id === id); return tech ? tech.name : id; };
+  const handleDeleteService = (serviceId: string) => {
+      if (!window.confirm("¿Eliminar este servicio externo?")) return;
+      const newServices = (ot.services || []).filter(s => s.id !== serviceId);
+      updateWorkOrder(ot.id, { services: newServices });
+  };
+
+  const handleDeleteMaterial = (index: number) => {
+      if (!window.confirm("¿Eliminar este material de la OT? (El stock no se repondrá automáticamente)")) return;
+      const newMaterials = [...ot.materials];
+      newMaterials.splice(index, 1);
+      updateWorkOrder(ot.id, { materials: newMaterials });
+  };
 
   const handleStartOT = () => {
     if (!ot.isBudgetApproved) { alert('No se puede iniciar el trabajo. El presupuesto aún está PENDIENTE DE APROBACIÓN.'); return; }
@@ -83,7 +100,9 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       setEditForm({
           title: ot.title, clientId: ot.clientId, priority: ot.priority, area: ot.area, description: ot.description,
           identification: ot.identification, clientGuide: ot.clientGuide, clientOC: ot.clientOC,
-          estimatedCompletionDate: ot.estimatedCompletionDate.split('T')[0], quoteNumber: ot.quoteNumber,
+          estimatedCompletionDate: ot.estimatedCompletionDate.split('T')[0], 
+          creationDate: ot.creationDate.split('T')[0], // Allow editing creation date
+          quoteNumber: ot.quoteNumber,
           technicianId: ot.technicianId, status: ot.status
       });
       setEditErrors({});
@@ -104,11 +123,17 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       }
 
       if (window.confirm('¿Guardar cambios en la Orden de Trabajo?')) {
-          let isoDate = ot.estimatedCompletionDate;
+          let isoDeliveryDate = ot.estimatedCompletionDate;
           if (editForm.estimatedCompletionDate && editForm.estimatedCompletionDate !== ot.estimatedCompletionDate.split('T')[0]) {
-              isoDate = new Date(editForm.estimatedCompletionDate).toISOString();
+              isoDeliveryDate = new Date(editForm.estimatedCompletionDate).toISOString();
           }
-          updateWorkOrder(ot.id, { ...editForm, estimatedCompletionDate: isoDate });
+
+          let isoCreationDate = ot.creationDate;
+          if (editForm.creationDate && editForm.creationDate !== ot.creationDate.split('T')[0]) {
+              isoCreationDate = new Date(editForm.creationDate).toISOString();
+          }
+
+          updateWorkOrder(ot.id, { ...editForm, estimatedCompletionDate: isoDeliveryDate, creationDate: isoCreationDate });
           setIsEditing(false);
           addToast("Orden de Trabajo actualizada", "SUCCESS");
       }
@@ -259,7 +284,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
 
         {/* Tabs */}
         <div className="flex border-b border-slate-200 dark:border-slate-800 px-6 bg-white dark:bg-slate-900 shrink-0">
-          {[{id: 'INFO', label: 'Planificación'}, {id: 'RESOURCES', label: 'Costos & Recursos'}, {id: 'COMMENTS', label: 'Bitácora'}, {id: 'PHOTOS', label: 'Evidencia'}].map((tab) => (
+          {[{id: 'INFO', label: 'Planificación'}, {id: 'RESOURCES', label: 'Costos & Recursos'}, {id: 'COMMENTS', label: 'Bitácora'}, {id: 'PHOTOS', label: 'Evidencia (En Const.)'}].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === tab.id ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>{tab.label}</button>
           ))}
         </div>
@@ -323,8 +348,8 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-50 dark:border-slate-800">
                         <div>
-                            <span className="block font-bold text-slate-400">Inicio</span>
-                            {formatDateTime(ot.startDate)}
+                            <span className="block font-bold text-slate-400">Fecha Ingreso</span>
+                            {isEditing ? <input type="date" className="input-std py-0 text-xs" value={editForm.creationDate} onChange={e => setEditForm({...editForm, creationDate: e.target.value})}/> : formatDateTime(ot.creationDate)}
                         </div>
                         <div>
                             <span className="block font-bold text-slate-400">Entrega Estimada</span>
@@ -416,11 +441,22 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                         <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-100 dark:border-slate-800 font-bold text-sm text-slate-700 dark:text-slate-200">Materiales Utilizados</div>
                         <div className="p-0">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800"><tr><th className="p-3">Item</th><th className="p-3 text-right">Cant</th><th className="p-3 text-right">Total</th></tr></thead>
+                                <thead className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800"><tr><th className="p-3">Item</th><th className="p-3 text-right">Cant</th><th className="p-3 text-right">Total</th>{isSupervisor && <th className="p-3 w-8"></th>}</tr></thead>
                                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                    {ot.materials.length === 0 ? (<tr><td colSpan={3} className="p-4 text-center text-slate-400 italic">Sin materiales cargados</td></tr>) : 
+                                    {ot.materials.length === 0 ? (<tr><td colSpan={isSupervisor?4:3} className="p-4 text-center text-slate-400 italic">Sin materiales cargados</td></tr>) : 
                                     ot.materials.map((m, i) => (
-                                        <tr key={i}><td className="p-3 dark:text-slate-300">{m.name}</td><td className="p-3 text-right dark:text-slate-300">{m.quantity}</td><td className="p-3 text-right font-mono dark:text-slate-300">${(m.totalCost || 0).toLocaleString()}</td></tr>
+                                        <tr key={i} className="group">
+                                            <td className="p-3 dark:text-slate-300">{m.name}</td>
+                                            <td className="p-3 text-right dark:text-slate-300">{m.quantity}</td>
+                                            <td className="p-3 text-right font-mono dark:text-slate-300">${(m.totalCost || 0).toLocaleString()}</td>
+                                            {isSupervisor && (
+                                                <td className="p-3 text-center">
+                                                    <button onClick={() => handleDeleteMaterial(i)} className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                                        <Icons.Trash size={14} />
+                                                    </button>
+                                                </td>
+                                            )}
+                                        </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -444,9 +480,12 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
 
                                 <ul className="mt-4 space-y-2">
                                     {(ot.labor || []).map(l => (
-                                        <li key={l.id} className="text-xs flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1">
+                                        <li key={l.id} className="text-xs flex justify-between items-center border-b border-slate-50 dark:border-slate-800 pb-1 group">
                                             <span className="dark:text-slate-300"><b>{l.technicianName}</b>: {l.description}</span>
-                                            <span className="font-mono font-bold dark:text-slate-200">{l.hours}h</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono font-bold dark:text-slate-200">{l.hours}h</span>
+                                                {isSupervisor && <button onClick={() => handleDeleteLabor(l.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash size={12}/></button>}
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -465,9 +504,12 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                                 
                                  <ul className="mt-4 space-y-2">
                                     {(ot.services || []).map(s => (
-                                        <li key={s.id} className="text-xs flex justify-between border-b border-slate-50 dark:border-slate-800 pb-1">
+                                        <li key={s.id} className="text-xs flex justify-between items-center border-b border-slate-50 dark:border-slate-800 pb-1 group">
                                             <span className="dark:text-slate-300"><b>{s.provider}</b>: {s.description}</span>
-                                            <span className="font-mono font-bold dark:text-slate-200">${s.cost.toLocaleString()}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono font-bold dark:text-slate-200">${s.cost.toLocaleString()}</span>
+                                                {isSupervisor && <button onClick={() => handleDeleteService(s.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash size={12}/></button>}
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
