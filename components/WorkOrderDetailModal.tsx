@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { WorkOrder, Status, Comment, WorkOrderTask, LaborEntry, ServiceEntry } from '../types';
+import { WorkOrder, Status, Comment, WorkOrderTask, LaborEntry, ServiceEntry, Priority, Area } from '../types';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Icons } from './Icons';
@@ -82,7 +83,8 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       setEditForm({
           title: ot.title, clientId: ot.clientId, priority: ot.priority, area: ot.area, description: ot.description,
           identification: ot.identification, clientGuide: ot.clientGuide, clientOC: ot.clientOC,
-          estimatedCompletionDate: ot.estimatedCompletionDate.split('T')[0], quoteNumber: ot.quoteNumber
+          estimatedCompletionDate: ot.estimatedCompletionDate.split('T')[0], quoteNumber: ot.quoteNumber,
+          technicianId: ot.technicianId, status: ot.status
       });
       setEditErrors({});
       setIsEditing(true);
@@ -108,6 +110,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
           }
           updateWorkOrder(ot.id, { ...editForm, estimatedCompletionDate: isoDate });
           setIsEditing(false);
+          addToast("Orden de Trabajo actualizada", "SUCCESS");
       }
   };
 
@@ -126,7 +129,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
 
   const EditInput = ({ field, value, onChange, type = "text" }: any) => (
       <>
-          <input type={type} className={`input-std py-1 ${editErrors[field] ? 'border-red-500' : ''}`} value={value || ''} onChange={onChange} />
+          <input type={type} className={`input-std py-1 text-sm ${editErrors[field] ? 'border-red-500' : ''}`} value={value || ''} onChange={onChange} />
           {editErrors[field] && <span className="text-xs text-red-500">{editErrors[field]}</span>}
       </>
   );
@@ -212,6 +215,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
           <div className="flex-1">
             {isEditing ? (
                 <div className="flex gap-2 flex-col">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Título de OT</label>
                     <input 
                         className={`text-xl font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-900 border rounded px-2 ${editErrors.title ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
                         value={editForm.title}
@@ -233,8 +237,8 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
               <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full transition-colors text-xs font-bold shadow-sm">
                   <Icons.Download size={16} /> Imprimir Hoja Ruta
               </button>
-              {isSupervisor && !isEditing && ot.status !== Status.FINISHED && (
-                  <button onClick={startEditing} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full transition-colors"><Icons.Edit size={20} /></button>
+              {isSupervisor && !isEditing && (
+                  <button onClick={startEditing} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full transition-colors" title="Editar OT"><Icons.Edit size={20} /></button>
               )}
               {isEditing && (
                   <div className="flex gap-1 mr-2">
@@ -269,8 +273,40 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center border-b border-slate-50 dark:border-slate-800 pb-2">
                         <span className="text-sm text-slate-500 dark:text-slate-400 font-semibold">Estado</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${ot.status === Status.FINISHED ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>{ot.status}</span>
+                        {isEditing ? (
+                            <select className="input-std py-0 text-xs w-auto" value={editForm.status} onChange={(e) => setEditForm({...editForm, status: e.target.value as Status})}>
+                                {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        ) : (
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${ot.status === Status.FINISHED ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>{ot.status}</span>
+                        )}
                     </div>
+                    
+                    {/* Campos adicionales editables */}
+                    {isEditing && (
+                        <div className="grid grid-cols-2 gap-4 pb-2 border-b border-slate-50 dark:border-slate-800">
+                             <div>
+                                <span className="label-xs block">Prioridad</span>
+                                <select className="input-std py-1 text-sm" value={editForm.priority} onChange={(e) => setEditForm({...editForm, priority: e.target.value as Priority})}>
+                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <span className="label-xs block">Área</span>
+                                <select className="input-std py-1 text-sm" value={editForm.area} onChange={(e) => setEditForm({...editForm, area: e.target.value as Area})}>
+                                    {Object.values(Area).map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                            </div>
+                             <div className="col-span-2">
+                                <span className="label-xs block">Técnico Principal</span>
+                                <select className="input-std py-1 text-sm" value={editForm.technicianId || ''} onChange={(e) => setEditForm({...editForm, technicianId: e.target.value})}>
+                                    <option value="">-- Sin Asignar --</option>
+                                    {availableTechnicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <span className="label-xs block">Identificación</span>
@@ -283,7 +319,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                     </div>
                     <div>
                          <span className="label-xs block">Descripción</span>
-                         {isEditing ? <textarea className="input-std h-20" value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})}/> : <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">{ot.description}</p>}
+                         {isEditing ? <textarea className="input-std h-20 text-sm" value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})}/> : <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">{ot.description}</p>}
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-50 dark:border-slate-800">
                         <div>
@@ -496,9 +532,9 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-sm">
                    <Icons.Upload size={32} className="text-slate-400 dark:text-slate-500"/>
                </div>
-               <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Módulo en Construcción</h3>
+               <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">En Construcción</h3>
                <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
-                   Estamos implementando un servidor seguro para el almacenamiento de evidencia fotográfica. Esta funcionalidad estará disponible en la próxima actualización.
+                   Estamos trabajando en el servidor de evidencia multimedia. Esta funcionalidad estará disponible en la próxima actualización.
                </p>
                <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-200 dark:border-blue-800">
                    Próximamente
