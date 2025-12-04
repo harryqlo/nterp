@@ -172,7 +172,7 @@ export interface DebugLogEntry {
   timestamp: string;
   level: 'INFO' | 'WARN' | 'ERROR';
   message: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 // Supply / Warehouse Management

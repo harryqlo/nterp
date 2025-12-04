@@ -43,7 +43,9 @@ import {
   ArrowRight,
   ChevronsRight,
   ChevronsLeft,
-  TrendingUp
+  TrendingUp,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export const Icons = {
@@ -93,5 +95,7 @@ export const Icons = {
   ArrowRight: ArrowRight,
   ChevronsRight: ChevronsRight,
   ChevronsLeft: ChevronsLeft,
-  TrendingUp: TrendingUp
+  TrendingUp: TrendingUp,
+  Sun: Sun,
+  Moon: Moon
 };
