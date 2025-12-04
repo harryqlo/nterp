@@ -4,13 +4,20 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Critical for GitHub Pages: uses relative paths (./) so assets load correctly
-  // regardless of the repository name/subdirectory.
-  base: './', 
+  // Essential for GitHub Pages subdirectories
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'recharts', 'date-fns', 'lucide-react'],
+        },
+      },
+    },
   },
   server: {
     port: 3000
