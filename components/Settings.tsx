@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -7,8 +7,9 @@ import { Icons } from './Icons';
 
 export const Settings: React.FC = () => {
   const { settings, updateSettings } = useApp();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security check - double layer (Sidebar handles navigation, this handles rendering)
   if (!user || user.role !== 'ADMIN') {
@@ -34,6 +35,62 @@ export const Settings: React.FC = () => {
       } else {
           addToast("Operación cancelada.", "INFO");
       }
+  };
+
+  const handleBackup = () => {
+      const data: Record<string, any> = {};
+      // Collect all keys starting with 'north_chrome_'
+      for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('north_chrome_')) {
+              try {
+                data[key] = JSON.parse(localStorage.getItem(key) || 'null');
+              } catch (e) {
+                data[key] = localStorage.getItem(key);
+              }
+          }
+      }
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_north_chrome_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast("Copia de seguridad descargada.", "SUCCESS");
+  };
+
+  const handleRestoreClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          try {
+              const json = JSON.parse(event.target?.result as string);
+              if (window.confirm("¿Está seguro? Esto sobrescribirá los datos actuales con los del archivo de respaldo.")) {
+                  Object.keys(json).forEach(key => {
+                      if (key.startsWith('north_chrome_')) {
+                          localStorage.setItem(key, JSON.stringify(json[key]));
+                      }
+                  });
+                  addToast("Datos restaurados correctamente. Recargando...", "SUCCESS");
+                  setTimeout(() => window.location.reload(), 1500);
+              }
+          } catch (err) {
+              console.error(err);
+              addToast("Error al leer el archivo de respaldo.", "ERROR");
+          }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset input
   };
 
   return (
@@ -158,8 +215,42 @@ export const Settings: React.FC = () => {
                       </label>
                   </div>
 
-                  {/* Data Management */}
-                   <div className="p-4 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-lg mt-6">
+                  {/* Data Management (Backup / Restore / Reset) */}
+                   <div className="p-4 border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/10 rounded-lg mt-6">
+                      <div className="flex items-start gap-4">
+                          <div className="p-3 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                              <Icons.Upload size={24} />
+                          </div>
+                          <div className="flex-1">
+                              <h4 className="font-bold text-blue-800 dark:text-blue-200 text-sm">Respaldo de Datos</h4>
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">Descargue una copia de seguridad o restaure datos anteriores.</p>
+                              
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                  <button 
+                                    onClick={handleBackup}
+                                    className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 shadow-sm flex-1 flex items-center justify-center gap-2"
+                                  >
+                                    <Icons.Download size={16} /> Descargar Backup
+                                  </button>
+                                  <button 
+                                    onClick={handleRestoreClick}
+                                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-sm font-bold rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 shadow-sm flex-1 flex items-center justify-center gap-2"
+                                  >
+                                    <Icons.Upload size={16} /> Restaurar Backup
+                                  </button>
+                                  <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    accept=".json" 
+                                    onChange={handleRestoreFile}
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                   <div className="p-4 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-lg mt-4">
                       <div className="flex items-start gap-4">
                           <div className="p-3 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300">
                               <Icons.Trash size={24} />
