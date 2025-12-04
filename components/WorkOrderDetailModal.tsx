@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState } from 'react';
 import { WorkOrder, Status, Comment, WorkOrderTask, LaborEntry, ServiceEntry } from '../types';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
-  const { updateWorkOrder, technicians, settings, addDebugLog, users } = useApp();
+  const { updateWorkOrder, technicians, settings, users } = useApp();
   const { user } = useAuth();
   const { addToast } = useToast();
   const [newComment, setNewComment] = useState('');
@@ -27,46 +28,8 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
   const [laborForm, setLaborForm] = useState<{ techId: string, hours: number, desc: string }>({ techId: '', hours: 0, desc: '' });
   const [serviceForm, setServiceForm] = useState<{ provider: string, desc: string, cost: number, ref: string }>({ provider: '', desc: '', cost: 0, ref: '' });
 
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [pendingPhotos, setPendingPhotos] = useState<string[]>([]);
-  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const availableTechnicians = users.filter(u => u.role === 'TECHNICIAN' && u.active);
   const isSupervisor = user?.role === 'ADMIN' || user?.role === 'MANAGER';
-
-  useEffect(() => {
-    if (activeTab === 'PHOTOS' && photos.length === 0) {
-      setIsLoadingPhotos(true);
-      setPhotoError(null);
-      if (!settings.photoServerUrl) { setPhotoError('URL del servidor de fotos no configurada.'); setIsLoadingPhotos(false); return; }
-      fetch(settings.photoServerUrl)
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          let loadedPhotos: string[] = [];
-          if (Array.isArray(data)) {
-            loadedPhotos = data.map((item: any) => {
-              if (typeof item === 'string') return item;
-              return item.download_url || item.url || item.src || '';
-            }).filter(url => url && typeof url === 'string' && url.length > 0);
-          }
-          const shuffled = loadedPhotos.sort(() => 0.5 - Math.random());
-          setPhotos(shuffled.slice(0, 6)); 
-        })
-        .catch((err) => {
-          console.error("Error cargando fotos:", err);
-          addDebugLog('ERROR', 'Failed to load remote gallery', { error: err.message });
-          setPhotoError('No se pudo cargar la galería remota.');
-        })
-        .finally(() => {
-          setIsLoadingPhotos(false);
-        });
-    }
-  }, [activeTab, settings.photoServerUrl, ot.id, photos.length, addDebugLog]);
 
   const handleAddComment = () => {
     if (!newComment.trim()) return;
@@ -102,22 +65,7 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       setServiceForm({ provider: '', desc: '', cost: 0, ref: '' });
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    const fileList = Array.from(files);
-    const readPromises = fileList.map((file: File) => new Promise<string>((resolve) => { const reader = new FileReader(); reader.onload = (e) => resolve(e.target?.result as string); reader.readAsDataURL(file); }));
-    try { 
-      const resolvedPhotos = await Promise.all(readPromises);
-      setPendingPhotos(prev => [...prev, ...resolvedPhotos]); 
-    } catch (error) { console.error("Error reading files", error); }
-    event.target.value = '';
-  };
-
-  const removePendingPhoto = (index: number) => setPendingPhotos(prev => prev.filter((_, i) => i !== index));
-  const confirmUpload = () => { setPhotos(prev => [...prev, ...pendingPhotos]); setPendingPhotos([]); };
   const getTechnicianName = (id?: string) => { if (!id) return null; const userTech = users.find(u => u.id === id); if (userTech) return userTech.name; const tech = technicians.find(t => t.id === id); return tech ? tech.name : id; };
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => { const target = e.currentTarget; if (target.src.includes('text=Imagen+no+disponible')) return; target.src = 'https://placehold.co/400x300?text=Imagen+no+disponible'; target.className = 'w-full h-full object-cover opacity-50 grayscale p-8 bg-slate-100 dark:bg-slate-800'; };
 
   const handleStartOT = () => {
     if (!ot.isBudgetApproved) { alert('No se puede iniciar el trabajo. El presupuesto aún está PENDIENTE DE APROBACIÓN.'); return; }
@@ -534,55 +482,17 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
           )}
 
           {activeTab === 'PHOTOS' && (
-            <div className="space-y-6">
-               <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 text-center border-dashed border-2 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                  <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
-                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Icons.Upload size={24} />
-                  </div>
-                  <p className="font-bold text-slate-700 dark:text-slate-200">Subir Evidencia Fotográfica</p>
-                  <p className="text-sm text-slate-400">Click para seleccionar imágenes</p>
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
+               <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                   <Icons.Upload size={32} className="text-slate-400 dark:text-slate-500"/>
                </div>
-
-               {pendingPhotos.length > 0 && (
-                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-                       <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-3 text-sm">Imágenes por subir ({pendingPhotos.length})</h4>
-                       <div className="flex gap-3 overflow-x-auto pb-2">
-                           {pendingPhotos.map((src, idx) => (
-                               <div key={idx} className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden group">
-                                   <img src={src} alt="preview" className="w-full h-full object-cover" />
-                                   <button onClick={() => removePendingPhoto(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.X size={12}/></button>
-                               </div>
-                           ))}
-                       </div>
-                       <div className="mt-3 flex justify-end">
-                           <button onClick={confirmUpload} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-blue-700 shadow-sm">Confirmar Carga</button>
-                       </div>
-                   </div>
-               )}
-
-               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {isLoadingPhotos ? (
-                     [1,2,3].map(i => <div key={i} className="aspect-square bg-slate-200 dark:bg-slate-800 rounded-xl animate-pulse"></div>)
-                  ) : photoError ? (
-                     <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
-                        <Icons.Alert size={32} className="mx-auto mb-2 opacity-50"/>
-                        <p>{photoError}</p>
-                     </div>
-                  ) : photos.length === 0 ? (
-                     <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">Sin imágenes en la galería.</div>
-                  ) : (
-                      photos.map((url, idx) => (
-                          <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative group shadow-sm hover:shadow-md transition-all">
-                              <img src={url} alt={`Evidencia ${idx}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" onError={handleImageError} loading="lazy" />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                  <button className="p-2 bg-white/20 text-white rounded-full hover:bg-white/40 backdrop-blur-sm"><Icons.Search size={20}/></button>
-                                  <button className="p-2 bg-white/20 text-white rounded-full hover:bg-red-500/80 backdrop-blur-sm"><Icons.Trash size={20}/></button>
-                              </div>
-                          </div>
-                      ))
-                  )}
-               </div>
+               <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Módulo en Construcción</h3>
+               <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+                   Estamos implementando un servidor seguro para el almacenamiento de evidencia fotográfica. Esta funcionalidad estará disponible en la próxima actualización.
+               </p>
+               <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-200 dark:border-blue-800">
+                   Próximamente
+               </span>
             </div>
           )}
         </div>
