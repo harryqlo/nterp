@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { WorkOrder, Status, Comment, WorkOrderTask, LaborEntry, ServiceEntry } from '../types';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Icons } from './Icons';
-import { formatDateTime } from '../utils/dateUtils';
+import { formatDateTime, formatDate } from '../utils/dateUtils';
 import { isNotEmpty } from '../utils/validationUtils';
 import { useToast } from '../context/ToastContext';
 
@@ -165,7 +164,9 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
       }
   };
 
-  const handlePrint = () => { window.alert("Función de impresión simulada para " + ot.id); };
+  const handlePrint = () => { 
+      window.print();
+  };
 
   const totalTasks = ot.tasks?.length || 0;
   const completedTasks = ot.tasks?.filter(t => t.isCompleted).length || 0;
@@ -184,7 +185,69 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+    <>
+    {/* --- PRINT ONLY LAYOUT --- */}
+    <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 font-sans text-black">
+        <div className="border-b-2 border-slate-800 pb-4 mb-6 flex justify-between items-start">
+            <div>
+                <h1 className="text-3xl font-bold uppercase tracking-wide">Orden de Trabajo</h1>
+                <p className="text-lg text-slate-600 font-bold">{settings.companyName}</p>
+            </div>
+            <div className="text-right">
+                <h2 className="text-4xl font-mono font-bold">{ot.id}</h2>
+                <p className="text-sm text-slate-500">Fecha Ingreso: {formatDate(ot.creationDate)}</p>
+                <div className="mt-2 border border-slate-800 px-2 py-1 text-center font-bold">{ot.area}</div>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-8 mb-6">
+            <div className="space-y-2">
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Cliente:</span> <span>{ot.clientId}</span></div>
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Identificación:</span> <span>{ot.identification || 'N/A'}</span></div>
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Orden Compra:</span> <span>{ot.clientOC || 'N/A'}</span></div>
+            </div>
+            <div className="space-y-2">
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Entrega Est.:</span> <span>{formatDate(ot.estimatedCompletionDate)}</span></div>
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Prioridad:</span> <span>{ot.priority}</span></div>
+                <div className="flex border-b border-slate-300 pb-1"><span className="w-32 font-bold uppercase text-xs">Técnico:</span> <span>{getTechnicianName(ot.technicianId) || 'Pendiente'}</span></div>
+            </div>
+        </div>
+
+        <div className="mb-8 p-4 border border-slate-300 rounded bg-slate-50">
+            <h3 className="font-bold uppercase text-xs mb-2 text-slate-500">Descripción del Trabajo</h3>
+            <p className="whitespace-pre-wrap text-sm">{ot.description}</p>
+        </div>
+
+        <div className="mb-8">
+             <h3 className="font-bold uppercase text-sm border-b-2 border-slate-800 mb-2">Planificación de Tareas</h3>
+             <ul className="space-y-2">
+                 {(ot.tasks || []).length > 0 ? (ot.tasks || []).map((t, i) => (
+                     <li key={i} className="flex items-start gap-2">
+                         <div className="w-4 h-4 border border-slate-400 mt-0.5"></div>
+                         <span className="text-sm">{t.description}</span>
+                     </li>
+                 )) : <li className="text-sm italic text-slate-500">Sin tareas definidas.</li>}
+             </ul>
+        </div>
+
+        <div className="grid grid-cols-2 gap-12 mt-20 pt-10 border-t border-slate-200">
+             <div className="text-center">
+                 <div className="border-b border-black mb-2 mx-10"></div>
+                 <p className="text-xs uppercase font-bold">Firma Técnico Responsable</p>
+             </div>
+             <div className="text-center">
+                 <div className="border-b border-black mb-2 mx-10"></div>
+                 <p className="text-xs uppercase font-bold">VºBº Supervisor / Control Calidad</p>
+             </div>
+        </div>
+        
+        <div className="fixed bottom-4 left-0 w-full text-center text-xs text-slate-400">
+            Generado por Sistema North Chrome | {new Date().toLocaleString()}
+        </div>
+    </div>
+
+    {/* --- NORMAL MODAL LAYOUT --- */}
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
       <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
         
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
@@ -209,7 +272,9 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
           </div>
           
           <div className="flex items-center gap-2">
-              <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full transition-colors"><Icons.Download size={20} /></button>
+              <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full transition-colors text-xs font-bold shadow-sm">
+                  <Icons.Download size={16} /> Imprimir
+              </button>
               {isSupervisor && !isEditing && ot.status !== Status.FINISHED && (
                   <button onClick={startEditing} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full transition-colors"><Icons.Edit size={20} /></button>
               )}
@@ -547,5 +612,6 @@ export const WorkOrderDetailModal: React.FC<Props> = ({ ot, onClose }) => {
 
       </div>
     </div>
+    </>
   );
 };

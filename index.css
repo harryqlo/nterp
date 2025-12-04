@@ -80,3 +80,35 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* Print Styles */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  .print\:block, .print\:block * {
+    visibility: visible;
+  }
+
+  .print\:block {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide scrollbars during print */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { Status, Area } from '../types';
+import { Status, Area, Priority, WorkOrder } from '../types';
 import { getDeadlineStatus, formatDate } from '../utils/dateUtils';
 import { PERMISSIONS } from '../utils/roleUtils';
 import { Icons } from './Icons';
@@ -11,9 +11,11 @@ import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 export const WorkOrderList: React.FC = () => {
   const { workOrders } = useApp();
   const { user } = useAuth();
+  const [viewMode, setViewMode] = useState<'LIST' | 'BOARD'>('LIST');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterArea, setFilterArea] = useState<string>('ALL');
   const [onlyUrgent, setOnlyUrgent] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [selectedOtId, setSelectedOtId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -24,6 +26,10 @@ export const WorkOrderList: React.FC = () => {
   const filteredOrders = workOrders.filter(ot => {
     const matchStatus = filterStatus === 'ALL' || ot.status === filterStatus;
     const matchArea = filterArea === 'ALL' || ot.area === filterArea;
+    const matchSearch = searchTerm === '' || 
+                        ot.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        ot.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        ot.clientId.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchUrgent = true;
     if (onlyUrgent) {
@@ -31,26 +37,94 @@ export const WorkOrderList: React.FC = () => {
       matchUrgent = deadline.color.includes('red') || deadline.color.includes('yellow');
     }
 
-    return matchStatus && matchArea && matchUrgent;
+    return matchStatus && matchArea && matchUrgent && matchSearch;
   });
+
+  // Kanban Columns Configuration
+  const columns = [
+    { status: Status.PENDING, title: 'Por Iniciar', color: 'border-l-4 border-slate-400' },
+    { status: Status.IN_PROCESS, title: 'En Proceso', color: 'border-l-4 border-blue-500' },
+    { status: Status.WAITING, title: 'En Espera / Pausa', color: 'border-l-4 border-orange-400' },
+    { status: Status.FINISHED, title: 'Finalizado / Calidad', color: 'border-l-4 border-green-500' }
+  ];
+
+  const KanbanCard = ({ ot }: { ot: WorkOrder }) => {
+    const deadline = getDeadlineStatus(ot.estimatedCompletionDate, ot.status);
+    const progress = ot.tasks && ot.tasks.length > 0 
+        ? Math.round((ot.tasks.filter(t => t.isCompleted).length / ot.tasks.length) * 100) 
+        : 0;
+
+    return (
+      <div 
+        onClick={() => setSelectedOtId(ot.id)}
+        className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all cursor-pointer group mb-3 relative overflow-hidden"
+      >
+         {!ot.isBudgetApproved && <div className="absolute top-0 right-0 w-3 h-3 bg-orange-500 rounded-bl-lg" title="Presupuesto Pendiente"></div>}
+         
+         <div className="flex justify-between items-start mb-2">
+            <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{ot.id}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${deadline.color}`}>
+                {deadline.label === 'En plazo' ? formatDate(ot.estimatedCompletionDate) : deadline.label}
+            </span>
+         </div>
+         
+         <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1 line-clamp-2">{ot.title}</h4>
+         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 truncate">{ot.clientId}</p>
+         
+         <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700">
+             <div className="flex items-center gap-2">
+                 {ot.priority === Priority.URGENT && <Icons.Alert size={14} className="text-red-500" />}
+                 <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 rounded">{ot.area}</span>
+             </div>
+             {ot.status === Status.IN_PROCESS && (
+                 <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                     <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                         <div className="h-full bg-blue-500" style={{ width: `${progress}%` }}></div>
+                     </div>
+                     {progress}%
+                 </div>
+             )}
+         </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Órdenes de Trabajo</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Gestión y seguimiento de trabajos en planta.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Gestión visual del flujo productivo.</p>
         </div>
         
-        {canCreate && (
-          <button 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Icons.Plus size={18} />
-            <span>Nueva OT</span>
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 flex">
+                <button 
+                    onClick={() => setViewMode('LIST')}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'LIST' ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Vista Lista"
+                >
+                    <Icons.Orders size={18} />
+                </button>
+                <button 
+                    onClick={() => setViewMode('BOARD')}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'BOARD' ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Vista Tablero (Kanban)"
+                >
+                    <Icons.Dashboard size={18} />
+                </button>
+            </div>
+
+            {canCreate && (
+            <button 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                onClick={() => setIsCreateModalOpen(true)}
+            >
+                <Icons.Plus size={18} />
+                <span>Nueva OT</span>
+            </button>
+            )}
+        </div>
       </div>
 
       {/* Filters Toolbar */}
@@ -60,14 +134,28 @@ export const WorkOrderList: React.FC = () => {
           <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Filtros:</span>
         </div>
         
-        <select 
-          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="ALL">Todos los Estados</option>
-          {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        {/* Search in Toolbar */}
+        <div className="relative">
+            <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <input 
+                type="text" 
+                placeholder="Buscar OT..." 
+                className="pl-8 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 outline-none w-40 sm:w-64"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+        </div>
+
+        {viewMode === 'LIST' && (
+            <select 
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            >
+            <option value="ALL">Todos los Estados</option>
+            {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+        )}
 
         <select 
           className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
@@ -85,11 +173,12 @@ export const WorkOrderList: React.FC = () => {
             onChange={(e) => setOnlyUrgent(e.target.checked)}
             className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700"
           />
-          <span>Solo Próximas a Vencer</span>
+          <span>Solo Críticas</span>
         </label>
       </div>
 
-      {/* Table */}
+      {viewMode === 'LIST' ? (
+      /* Table View */
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -110,7 +199,7 @@ export const WorkOrderList: React.FC = () => {
                 const deadline = getDeadlineStatus(ot.estimatedCompletionDate, ot.status);
                 
                 return (
-                  <tr key={ot.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+                  <tr key={ot.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group cursor-pointer" onClick={() => setSelectedOtId(ot.id)}>
                     <td className="p-4 font-semibold text-slate-900 dark:text-white font-mono">
                         {ot.id}
                         <div className="text-[10px] text-slate-400 font-normal">{formatDate(ot.creationDate)}</div>
@@ -149,12 +238,11 @@ export const WorkOrderList: React.FC = () => {
                       }`}>
                         <Icons.Clock size={12} className="mr-1.5" />
                         {formatDate(ot.estimatedCompletionDate)} 
-                        <span className="ml-2 opacity-80">({deadline.label})</span>
                       </div>
                     </td>
                     <td className="p-4 text-right">
                       <button 
-                        onClick={() => setSelectedOtId(ot.id)}
+                        onClick={(e) => { e.stopPropagation(); setSelectedOtId(ot.id); }}
                         className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-slate-800 transition-all"
                         title="Ver Detalle"
                       >
@@ -168,6 +256,31 @@ export const WorkOrderList: React.FC = () => {
           </table>
         </div>
       </div>
+      ) : (
+        /* Kanban Board View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
+            {columns.map(col => {
+                const colOrders = filteredOrders.filter(ot => ot.status === col.status);
+                return (
+                    <div key={col.status} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
+                        <div className={`p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-xl sticky top-0 z-10 ${col.color}`}>
+                            <div className="flex justify-between items-center">
+                                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{col.title}</h3>
+                                <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">{colOrders.length}</span>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+                            {colOrders.length === 0 ? (
+                                <div className="text-center py-10 text-slate-400 text-xs italic border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">Sin OTs</div>
+                            ) : (
+                                colOrders.map(ot => <KanbanCard key={ot.id} ot={ot} />)
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+      )}
 
       {/* Modals */}
       {selectedOt && (
