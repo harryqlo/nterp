@@ -1,20 +1,30 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Icons } from './Icons';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime } from '../utils/dateUtils';
 
 export const Header: React.FC = () => {
-  const { activityLog, workOrders } = useApp();
+  const { activityLog, workOrders, settings, updateSettings } = useApp();
   const { logout, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
 
   // Simple search logic
-  const suggestions = searchTerm.length > 1 
-    ? workOrders.filter(ot => ot.id.toLowerCase().includes(searchTerm.toLowerCase()) || ot.title.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 5)
-    : [];
+  const suggestions = useMemo(() => {
+    if (searchTerm.length <= 1) return [];
+    return workOrders
+      .filter((ot) =>
+        ot.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ot.title.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .slice(0, 5);
+  }, [searchTerm, workOrders]);
+
+  const toggleTheme = () => {
+    updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' });
+  };
 
   return (
     <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-20 shadow-sm transition-colors duration-300">
@@ -46,10 +56,19 @@ export const Header: React.FC = () => {
 
       {/* Actions */}
       <div className="flex items-center space-x-4">
-        
+
+        {/* Theme Toggle */}
+        <button
+          className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+          onClick={toggleTheme}
+          aria-label="Cambiar tema"
+        >
+          {settings.theme === 'dark' ? <Icons.Sun size={18} /> : <Icons.Moon size={18} />}
+        </button>
+
         {/* Notifications */}
         <div className="relative">
-          <button 
+          <button
             className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
             onClick={() => setShowNotifs(!showNotifs)}
           >

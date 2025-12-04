@@ -178,7 +178,7 @@ interface AppContextProps {
   addToolMaintenance: (maint: ToolMaintenance) => void;
 
   logActivity: (action: ActivityLogEntry['action'], entity: ActivityLogEntry['entity'], details: string) => void;
-  addDebugLog: (level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) => void;
+  addDebugLog: (level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: Record<string, unknown>) => void;
   
   // Settings Method
   updateSettings: (newSettings: Partial<AppSettings>) => void;
@@ -277,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivityLog(prev => [newEntry, ...prev].slice(0, 50));
   }, [settings.debugModeEnabled]);
 
-  const addDebugLog = useCallback((level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) => {
+  const addDebugLog = useCallback((level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: Record<string, unknown>) => {
       if (settings.debugModeEnabled) {
          const color = level === 'ERROR' ? '#ef4444' : level === 'WARN' ? '#f59e0b' : '#10b981';
          console.log(`%c[DEBUG-${level}] ${message}`, `color: ${color}; font-weight: bold;`, data || '');
